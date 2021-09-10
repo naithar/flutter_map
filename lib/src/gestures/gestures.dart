@@ -736,8 +736,26 @@ abstract class MapGestureMixin extends State<FlutterMap>
       final max = options.maxZoom ?? double.infinity;
       final actualZoom = math.max(min, math.min(max, newZoom));
 
+      final scale = mapState.getZoomScale(mapState.zoom, actualZoom);
+
+      final positionInMap = _offsetToPoint(_focalStartLocal);
+
+      var percentXInCurrentBox = positionInMap.x / mapState.originalSize!.x;
+      var percentYInCurrentBox = positionInMap.y / mapState.originalSize!.y;
+
+      final newBox = mapState.size / scale;
+
+      var deltaX = (newBox.x - mapState.size.x) * (percentXInCurrentBox - 0.5);
+      var deltaY = (newBox.y - mapState.size.y) * (percentYInCurrentBox - 0.5);
+
+      final rotatedDelta = _rotateOffset( Offset(deltaX, deltaY) );
+
+      final oldCenterPt = mapState.project(mapState.center, newZoom);
+      final newCenterPt = oldCenterPt + _offsetToPoint(rotatedDelta);
+      final newCenter = mapState.unproject(newCenterPt, newZoom);
+
       mapState.move(
-        mapState.center,
+        newCenter,
         actualZoom,
         hasGesture: true,
         source: MapEventSource.doubleTapHold,
