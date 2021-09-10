@@ -306,6 +306,8 @@ abstract class MapGestureMixin extends State<FlutterMap>
     final flags = options.interactiveFlags;
     final focalOffset = details.localFocalPoint;
 
+    var newCenterOffset = Offset(0, 0);
+
     final currentRotation = radianToDeg(details.rotation);
 
     if (_dragMode) {
@@ -416,7 +418,8 @@ abstract class MapGestureMixin extends State<FlutterMap>
               newZoom = mapState.zoom;
             }
 
-            LatLng newCenter;
+            LatLng newCenter = mapState.center;
+
             if (hasMove) {
               if (!_pinchMoveStarted && _lastFocalLocal != focalOffset) {
                 _pinchMoveStarted = true;
@@ -435,18 +438,31 @@ abstract class MapGestureMixin extends State<FlutterMap>
 
               if (_pinchMoveStarted) {
                 final oldCenterPt = mapState.project(mapState.center, newZoom);
-                final localDistanceOffset =
-                    _rotateOffset(_lastFocalLocal - focalOffset);
+                
+                final localDistanceOffset = _rotateOffset(_lastFocalLocal - focalOffset);
 
-                final newCenterPt =
-                    oldCenterPt + _offsetToPoint(localDistanceOffset);
-                newCenter = mapState.unproject(newCenterPt, newZoom);
-              } else {
-                newCenter = mapState.center;
+                newCenterOffset = localDistanceOffset;
               }
-            } else {
-              newCenter = mapState.center;
             }
+
+            final scale = mapState.getZoomScale(mapState.zoom, newZoom);
+            
+            final positionInMap = _offsetToPoint(details.localFocalPoint);
+
+            var percentXInCurrentBox = positionInMap.x / mapState.originalSize!.x;
+            var percentYInCurrentBox = positionInMap.y / mapState.originalSize!.y;
+
+            final newBox = mapState.size / scale;
+
+            var deltaX = (newBox.x - mapState.size.x) * (percentXInCurrentBox - 0.5);
+            var deltaY = (newBox.y - mapState.size.y) * (percentYInCurrentBox - 0.5);
+
+            final rotatedDelta = _rotateOffset( Offset(deltaX, deltaY) );
+
+            final oldCenterPt = mapState.project(mapState.center, newZoom);
+            final newCenterPt = oldCenterPt + _offsetToPoint(newCenterOffset) + _offsetToPoint(rotatedDelta);
+
+            newCenter = mapState.unproject(newCenterPt, newZoom);
 
             if (_pinchZoomStarted || _pinchMoveStarted) {
               mapMoved = mapState.move(
