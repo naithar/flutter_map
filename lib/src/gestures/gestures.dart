@@ -37,10 +37,30 @@ abstract class MapGestureMixin extends State<FlutterMap>
           final zoom = delta > 0
               ? min(mapState.options.maxZoom ?? 19, mapState.zoom + delta)
               : max(mapState.options.minZoom ?? 0, mapState.zoom + delta);
-          print('zoom: $zoom');
+
           final newZoom = mapState.fitZoomToBounds(zoom);
+          
+          final scale = mapState.getZoomScale(mapState.zoom, newZoom);
+          
+          final widgetOffset = _getWidgetTopLeft();
+          final positionInMap = _offsetToPoint(widgetOffset == null 
+              ? pointerSignal.position 
+              : pointerSignal.position - widgetOffset);
+
+          var percentXInCurrentBox = positionInMap.x / mapState.size.x;
+          var percentYInCurrentBox = positionInMap.y / mapState.size.y;
+
+          final newBox = mapState.size / scale;
+        
+          var deltaX = (newBox.x - mapState.size.x) * (percentXInCurrentBox - 0.5);
+          var deltaY = (newBox.y - mapState.size.y) * (percentYInCurrentBox - 0.5);
+
+          final oldCenterPt = mapState.project(mapState.center, newZoom);
+          final newCenterPt = oldCenterPt + CustomPoint(deltaX, deltaY);
+          final newCenter = mapState.unproject(newCenterPt, newZoom);
+
           // Move the map to the new zoom level
-          mapState.move(mapState.center, newZoom,
+          mapState.move(newCenter, newZoom,
               source: MapEventSource.custom);
         });
       }
@@ -48,6 +68,12 @@ abstract class MapGestureMixin extends State<FlutterMap>
   }
 
   Map timeouts = {};
+
+  Offset? _getWidgetTopLeft() {
+    final translation =
+        context.findRenderObject()?.getTransformTo(null).getTranslation();
+    return translation != null ? Offset(translation.x, translation.y) : null;
+  }
 
   void _debounce(void Function() callback) {
     if (timeouts.containsKey(callback)) {
