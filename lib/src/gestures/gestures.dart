@@ -414,7 +414,8 @@ abstract class MapGestureMixin extends State<FlutterMap>
               newZoom = mapState.zoom;
             }
 
-            LatLng newCenter;
+            LatLng newCenter = mapState.center;
+            
             if (hasMove) {
               if (!_pinchMoveStarted && _lastFocalLocal != focalOffset) {
                 _pinchMoveStarted = true;
@@ -714,8 +715,39 @@ abstract class MapGestureMixin extends State<FlutterMap>
       final max = options.maxZoom ?? double.infinity;
       final actualZoom = math.max(min, math.min(max, newZoom));
 
+      // Determine new double tap center
+      final oldCenterPt = mapState.project(mapState.center, actualZoom);
+      final newFocalLatLong = _offsetToCrs(_focalStartLocal, actualZoom);
+      final newFocalPt = mapState.project(newFocalLatLong, actualZoom);
+      final oldFocalPt = mapState.project(_focalStartLatLng, actualZoom);
+      final zoomDifference = oldFocalPt - newFocalPt;
+      final moveDifference =
+          _rotateOffset(_focalStartLocal - _lastFocalLocal);
+
+      final newCenterPt = oldCenterPt +
+          zoomDifference +
+          _offsetToPoint(moveDifference);
+      final newCenter = mapState.unproject(newCenterPt, actualZoom);
+
+      // final scale = mapState.getZoomScale(mapState.zoom, actualZoom);
+      // final positionInMap = _offsetToPoint(_focalStartLocal);
+
+      // final percentXInCurrentBox = positionInMap.x / mapState.nonrotatedSize!.x;
+      // final percentYInCurrentBox = positionInMap.y / mapState.nonrotatedSize!.y;
+
+      // final newBox = mapState.size / scale;
+
+      // final deltaX = (newBox.x - mapState.size.x) * (percentXInCurrentBox - 0.5);
+      // final deltaY = (newBox.y - mapState.size.y) * (percentYInCurrentBox - 0.5);
+
+      // final rotatedDelta = _rotateOffset( Offset(deltaX, deltaY) );
+
+      // final oldCenterPt = mapState.project(mapState.center, newZoom);
+      // final newCenterPt = oldCenterPt + _offsetToPoint(rotatedDelta);
+      // final newCenter = mapState.unproject(newCenterPt, newZoom);
+
       mapState.move(
-        mapState.center,
+        newCenter,
         actualZoom,
         hasGesture: true,
         source: MapEventSource.doubleTapHold,
